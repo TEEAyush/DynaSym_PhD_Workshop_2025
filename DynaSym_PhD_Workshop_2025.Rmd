@@ -1,0 +1,79 @@
+---
+title: "DynaSym_PhD_Workshop_2025"
+output: pdf_document
+date: "2025-05-19"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Install Packages
+
+```{r install packages}
+install.packages("odin")
+install.packages("bbmle")
+library("odin")
+library("bbmle")
+```
+## Setup The Model as Function
+
+```{r model}
+log_growth_model <- odin({
+  
+  deriv(n) <- r* n * (1 - n/K)    # the logistic growth equation
+  
+  initial(n) <- n_initial   # provide the initial densityto solver
+  
+  # below : transfer of parameter values from R
+  n_initial <- user()
+  r <- user()
+  K <- user()
+  
+  
+})
+```
+
+## Assign parameter values
+
+```{r assign_log_model}
+
+lgm_assigned_01 <- log_growth_model$new(n_initial = 0.01, r = 0.5, K = 1000000)
+lgm_assigned_02 <- log_growth_model$new(n_initial = 0.01, r = 1, K = 1000000)
+lgm_assigned_03 <- log_growth_model$new(n_initial = 0.01, r = 0.5, K = 2000000)
+lgm_assigned_04 <- log_growth_model$new(n_initial = 0.1, r = 0.5, K = 1000000)
+
+
+```
+
+## Simulate the time series (Solve the equation)
+
+```{r run_log_model}
+
+lgm_output_01 <- lgm_assigned_01$run(seq(0,100, length = 1001))
+lgm_output_02 <- lgm_assigned_02$run(seq(0,100, length = 1001))
+lgm_output_03 <- lgm_assigned_03$run(seq(0,100, length = 1001))
+lgm_output_04 <- lgm_assigned_04$run(seq(0,100, length = 1001))
+
+```
+
+```{r show_log_model_head}
+
+#head(lgm_output_01)
+head(lgm_output_04)
+
+```
+## Plot log growth
+
+```{r plot_log_growth}
+
+## plot 1st model plot
+plot(lgm_output_01[,1],lgm_output_01[,2], type = "l")
+#plot(lgm_output_04[,1],lgm_output_04[,2], type = "l")
+
+## overlay other plots
+lines(lgm_output_04[,1],lgm_output_04[,2], col = "blue" , lwd = 2)
+
+```
+
+
