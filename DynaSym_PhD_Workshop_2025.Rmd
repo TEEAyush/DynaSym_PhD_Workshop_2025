@@ -11,10 +11,10 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Install Packages
 
 ```{r install packages}
-install.packages("odin")
-install.packages("bbmle")
-install.packages("pkgload")
-install.packages("devtools")
+#install.packages("odin")
+#install.packages("bbmle")
+#install.packages("pkgload")
+#install.packages("devtools")
 library("odin")
 library("bbmle")
 library("pkgload")
@@ -80,5 +80,111 @@ plot(lgm_output_01[,1],lgm_output_01[,2], type = "l")
 lines(lgm_output_04[,1],lgm_output_04[,2], col = "blue" , lwd = 2)
 
 ```
+
+## Lotka Voltera Comp model
+
+```{r LV_comp_model}
+
+LV_comp_model <- odin({
+  
+  deriv(n1) <- r1* n1 * (1 - (n1 + a12*n2)/K1)    #eqn for first competitior
+  deriv(n2) <- r2* n2 * (1 - (a21*n1 + n2)/K2)    #eqn for second competitior
+  
+  
+  initial(n1) <- n1_initial   # provide the initial density to solver
+  initial(n2) <- n2_initial
+  
+  
+  # below : transfer of parameter values from R
+  n1_initial <- user()
+  n2_initial <- user()
+  r1 <- user()
+  K1 <- user()
+  r2 <- user()
+  K2 <- user()
+  a12 <- user()
+  a21 <- user()
+  
+  
+})
+```
+
+## Assign parameter values
+
+```{r assign_LV_model}
+
+##### first come first serve scenario
+#LV_assigned_01 <-  LV_comp_model$new(n1_initial = 0.1,
+#                                     n2_initial = 0.01,
+#                                     r1 = 0.1, 
+#                                     K1 = 10,
+#                                     r2 = 0.1, 
+#                                     K2 = 10,
+#                                    a12 = 1,
+#                                    a21 = 1)
+
+##### Coexistence : K1 < K2/a21  and  K2 < K1/a12
+LV_assigned_02 <-  LV_comp_model$new(n1_initial = 0.01,
+                                     n2_initial = 0.01,
+                                     r1 = 0.1, 
+                                     K1 = 10,
+                                     r2 = 0.1, 
+                                     K2 = 10,
+                                    a12 = 0.2,
+                                    a21 = 0.3)
+
+##### One species dominates : K1 > K2/a21 and K2 < K1/a12 (or vice versa)
+LV_assigned_03 <-  LV_comp_model$new(n1_initial = 0.01,
+                                     n2_initial = 0.01,
+                                     r1 = 0.1, 
+                                     K1 = 10,
+                                     r2 = 0.1, 
+                                     K2 = 10,
+                                    a12 = 2,
+                                    a21 = 0.9)
+
+##### Competitive exclusion : K1 > K2/a21 and K2 > K1/a12 (depends on starting values)
+LV_assigned_04 <-  LV_comp_model$new(n1_initial = 0.01,
+                                     n2_initial = 0.01,
+                                     r1 = 0.1, 
+                                     K1 = 10,
+                                     r2 = 0.1, 
+                                     K2 = 10,
+                                    a12 = 2,
+                                    a21 = 3)
+
+
+```
+
+## Simulate the time series (Solve the equation)
+
+```{r run_LV_comp_model}
+
+#LV_output_01 <- LV_assigned_01$run(seq(0,100, length = 1001))
+LV_output_03 <- LV_assigned_03$run(seq(0,200, length = 1001))
+
+
+```
+
+
+```{r show_LV_model_head}
+
+#head(lgm_output_01)
+head(LV_output_02)
+
+```
+## Plot LV growth
+
+```{r plot_LV_growth}
+
+## plot 1st speices and 2nd species plot
+plot(LV_output_03[,1],LV_output_03[,2], type = "l", col = "red")
+
+
+## overlay 2nd species plot
+lines(LV_output_03[,1],LV_output_03[,3], type = "l", col = "blue")
+
+```
+
 
 
