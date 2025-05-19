@@ -13,8 +13,13 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r install packages}
 install.packages("odin")
 install.packages("bbmle")
+install.packages("pkgload")
+install.packages("devtools")
 library("odin")
 library("bbmle")
+library("pkgload")
+library("devtools")
+
 ```
 ## Setup The Model as Function
 
