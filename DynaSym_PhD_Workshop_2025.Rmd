@@ -186,5 +186,141 @@ lines(LV_output_03[,1],LV_output_03[,3], type = "l", col = "blue")
 
 ```
 
+## Rosenzweig Mac Arthur Model/ Paradox of Enrichment
 
+```{r setup_RMA_model}
+
+rma_model <- odin({
+  
+  ### the modified (beacause flexible exponent term q) Rosenzweig MacArthur consumer-resource model
+  deriv(n) <- r* n * (1 - n/K)      -       fmax * n^(1+q)/ (nhalf^(1+q) + n^(1+q)) * p      #eqn for prey
+  deriv(p) <-  fmax * n^(1+q)/ (nhalf^(1+q) + n^(1+q)) * p  -  m*p                           #eqn for predator
+  
+  
+  initial(n) <- n_initial   # provide the initial density to solver
+  initial(p) <- p_initial
+  
+  
+  # below : transfer of parameter values from R
+  n_initial <- user()
+  p_initial <- user()
+  r <- user()
+  K <- user()
+  fmax <- user()
+  nhalf <- user()
+  q <- user()
+  m <- user()
+  
+  
+})
+
+
+```
+## Assign Parameter values
+
+```{r assign_params_rma_model}
+
+
+rma_assigned_01 <-  rma_model$new(n_initial = 0.01,
+                                     p_initial = 0.01,
+                                     r = 1, 
+                                     K = 1,
+                                  fmax = 0.35 ,
+                                 nhalf = 0.5,
+                                     q = 0,  #creates type 2 functional response (q>0 = s shaped)
+                                     m = 0.1   
+)
+
+```
+
+## Run Model
+
+```{r rma_run_model}
+
+rma_output_01 <- rma_assigned_01$run(seq(0,1000,0.1))
+
+```
+
+```{r head_rma_model}
+
+head(rma_output_01)
+
+
+```
+## Plot RMA growth
+
+```{r plot_rma_growth}
+
+## plot 1st speices and 2nd species plot
+plot(rma_output_01[,1],rma_output_01[,3], type = "l", col = "blue")
+
+
+## overlay 2nd species plot
+lines(rma_output_01[,1],rma_output_01[,2], type = "l", col = "green")
+
+```
+
+## Creating a bifurcation diagram
+
+```{r simulate_RMA_nhalf_gradient}
+
+nhalf_input <- seq(0.25,0.75,0.001)
+
+#library("foreach")
+nhalf_gradient <- foreach(
+  i = 1:length(nhalf_input),
+  .combine = "rbind"   #combine various output using rbind
+) %do% {
+  
+  ### assigning model parameter values
+  rma_assigned_01 <-  rma_model$new(n_initial = 0.01,
+                                     p_initial = 0.01,
+                                     r = 1, 
+                                     K = 1,
+                                  fmax = 0.35 ,
+                                 nhalf = nhalf_input[i],
+                                     q = 0,  #creates type 2 functional response (q>0 = s shaped)
+                                     m = 0.1   
+)
+  time_out <- seq(0,1000,0.1)
+  
+  #simulate the model 
+  rma_output_01 <- rma_assigned_01$run(time_out)
+
+  cut_time <- round(0.75*length(time_out))   
+  
+  rma_output_01 <- rma_output_01[cut_time:length(time_out),] #only taking the last quarter of the time series post burn out
+  
+  #only output min and max predator densities
+  data.frame(
+    min_prey = min(rma_output_01[,2]),
+    max_prey = max(rma_output_01[,2]),
+    min_pred = min(rma_output_01[,3]),
+    max_pred = max(rma_output_01[,3])
+  )
+  
+}
+
+
+```
+
+
+## Plot the bifurcation diagram
+
+```{r plot_RMA_nhalf_gradient}
+
+plot(
+  x = c(nhalf_input, nhalf_input,nhalf_input,nhalf_input),
+  y = c(nhalf_gradient$min_prey,nhalf_gradient$max_prey, nhalf_gradient$min_pred, nhalf_gradient$max_pred),
+  type = "n",
+  xlab = "nhalf",
+  ylab = "population extremes"
+)
+
+points(nhalf_input,nhalf_gradient$min_prey, pch=16, cex=0.2,col="darkgreen")
+points(nhalf_input,nhalf_gradient$max_prey, pch=16, cex=0.2,col="darkgreen")
+points(nhalf_input,nhalf_gradient$min_pred, pch=16, cex=0.2,col="darkblue")
+points(nhalf_input,nhalf_gradient$max_pred, pch=16, cex=0.2,col="darkblue")
+
+```
 
