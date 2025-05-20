@@ -323,4 +323,315 @@ points(nhalf_input,nhalf_gradient$min_pred, pch=16, cex=0.2,col="darkblue")
 points(nhalf_input,nhalf_gradient$max_pred, pch=16, cex=0.2,col="darkblue")
 
 ```
+## Choosing values for parameters
+
+### Allometric scaling
+
+Biological rates follow approx. a 0.75 scaling power law (I is any rate here)
+
+$$I = I_0m^{0.75}$$
+This scaling is **per capita**, meaning per individuals
+
+However individuals differ across populations (e.g. one individual of algae is very different from one individual of daphnia)
+
+One possible solution : 
+
+finish notes from Bjorn's file, 
+
+Now till lunch, we'll try to do a similar bifurcation analysis as yestrday. Now the x axis gonna be
+body mass of the predator relative to the prey body mass
+
+## The equation system in odin
+
+```{r YImode_in_odin}
+
+yi_model <- odin({
+  
+  deriv(n) <- n * (1-n) - y*x*n / (nhalf + n) * p
+  deriv(p) <- e*y*x*n / (nhalf + n) * p - x * p 
+  
+  
+  initial(n) <- n_initial   # provide the initial density to solver
+  initial(p) <- p_initial
+  
+  
+  # below : transfer of parameter values from R
+  n_initial <- user()
+  p_initial <- user()
+  y <- user()
+  x <- user()
+  nhalf <- user()
+  e <- user()
+  
+})
+
+```
+```{r assign_yim}
+
+# x = x0*m^-0.25 # loss rate calc
+#x0 = 0.314 (+/-)? for herbivores
+
+yim_assigned <- yi_model$new(
+        n_initial = 0.5,
+        p_initial = 0.5,
+        y = 10,
+        x = 0.314,
+        nhalf = 0.5,
+        e = 0.45
+)
+
+```
+
+```{r simulate_yim}
+
+timesteps <- seq(0,5000,1)
+
+yim_output_01 <- yim_assigned$run(timesteps)
+
+```
+
+```{r plot_yim}
+
+plot(
+  x = c(yim_output_01[,1],yim_output_01[,1]),
+  y = c(yim_output_01[,2],yim_output_01[,3]),
+  type = "n",
+  xlab = "time",
+  ylab = "population density"
+)
+
+lines(yim_output_01[,1], yim_output_01[,2], col="green") # resource, a plant
+lines(yim_output_01[,1], yim_output_01[,3], col="blue") # predator, an invertebrate consumer
+
+
+```
+
+Here the consumer and the resource have the same size!
+
+Example of a consumer which is 100 times larger ()
+
+```{r assign_yim_100}
+
+# x = x0*m^-0.25 # loss rate calc
+#x0 = 0.314 (+/-)? for herbivores
+
+yim_assigned_100 <- yi_model$new(
+        n_initial = 0.5,
+        p_initial = 0.5,
+        y = 10,
+        x = 0.314*100^(-0.25),
+        nhalf = 0.5,
+        e = 0.45
+)
+
+```
+
+```{r simulate_yim_100}
+
+timesteps <- seq(0,5000,1)
+
+yim_output_100 <- yim_assigned_100$run(timesteps)
+
+```
+
+```{r plot_yim_100}
+
+plot(
+  x = c(yim_output_100[,1],yim_output_100[,1]),
+  y = c(yim_output_100[,2],yim_output_100[,3]),
+  type = "n",
+  xlab = "time",
+  ylab = "population density"
+)
+
+lines(yim_output_100[,1], yim_output_100[,2], col="green") # resource, a plant
+lines(yim_output_100[,1], yim_output_100[,3], col="blue") # predator, an invertebrate consumer
+
+
+```
+
+
+## Bifuraction diagram
+
+```{r simulate_yim_m_gradient}
+
+log_m_input <- seq(0,5,length=2000)
+
+library("foreach")
+m_gradient <- foreach(
+  i = 1:length(log_m_input),
+  .combine = "rbind"   #combine various output using rbind
+) %do% {
+  
+  ### assigning model parameter values
+  
+yim_assigned <- yi_model$new(
+        n_initial = 0.5,
+        p_initial = 0.5,
+        y = 10,
+        x = 10^(0.314 + -0.25*log_m_input[i]),
+        nhalf = 0.5,
+        e = 0.45
+)
+
+
+  time_out <- seq(0,5000,0.1)
+  
+  #simulate the model 
+  yim_output <- yim_assigned$run(time_out)
+
+  cut_time <- round(0.75*length(time_out))   
+  
+  yim_output <- yim_output[cut_time:length(time_out), ] #only taking the last quarter of the time series post burn out
+  
+  #only output min and max resource and consumer biomass
+  data.frame(
+    min_res = min(yim_output[,2]),
+    max_res = max(yim_output[,2]),
+    min_cons = min(yim_output[,3]),
+    max_cons = max(yim_output[,3])
+  )
+  
+}
+
+
+```
+
+
+## Plot the bifurcation diagram
+
+```{r plot_yim_m_gradient}
+
+plot(
+  x = c(log_m_input, log_m_input,log_m_input,log_m_input),
+  y = c(m_gradient$min_res,m_gradient$max_res, m_gradient$min_cons, m_gradient$max_cons),
+  type = "n",
+  xlab = "mass m",
+  ylab = "biomass extremes"
+)
+
+points(log_m_input,m_gradient$min_res, pch=16, cex=0.2,col="darkgreen")
+points(log_m_input,m_gradient$max_res, pch=16, cex=0.2,col="darkgreen")
+points(log_m_input,m_gradient$min_cons, pch=16, cex=0.2,col="darkblue")
+points(log_m_input,m_gradient$max_cons, pch=16, cex=0.2,col="darkblue")
+
+```
+
+
+## Nutrient uptake/Chemostat models
+
+### Uptake model
+
+**One nutrient**
+
+$$
+U = \frac{U_{max}N}{N_{half}+N}
+$$
+
+**two nutrients**
+
+$$
+U = min(\frac{U_{max1}N_1}{N_{half1}+N_1}, \frac{U_{max2}N_2}{N_{half2}+N_1})
+$$
+### The chemostat model
+
+$$
+\frac{dN_1}{dt} = D(S_1 - N_1) - min(\frac{U_{max1}N_1}{N_{half1}+N_1}, \frac{U_{max2}N_2}{N_{half2}+N_1})C
+$$
+$D$ turnover rate
+$S$ supply rate
+$N_{1,2}$ Nutrient concentrations
+$C$ Consumer density (individuals, biovolume, biomass)
+
+
+$$
+\frac{dN_2}{dt} = D(S_2 - N_2) - min(\frac{U_{max1}N_1}{N_{half1}+N_1}, \frac{U_{max2}N_2}{N_{half2}+N_1})C
+$$
+
+$$
+\frac{dC}{dt} = min(\frac{U_{max1}N_1}{N_{half1}+N_1}, \frac{U_{max2}N_2}{N_{half2}+N_1})C - D C
+$$
+## The equation system in odin
+
+```{r chemostatmodel_in_odin}
+
+chemostat_model <- odin({
+  
+  deriv(n1) <- d*(s1-n1) - min(umax1*n1/(nhalf1 + n1), umax2*n2/(nhalf2 + n2))*c
+  deriv(n2) <- d*(s2-n2) - min(umax1*n1/(nhalf1 + n1), umax2*n2/(nhalf2 + n2))*c
+  deriv(c) <- min(umax1*n1/(nhalf1 + n1), umax2*n2/(nhalf2 + n2))*c - d*c
+  
+  
+  initial(n1) <- n1_initial # provide the initial density to solver
+  initial(n2) <- n2_initial 
+  initial(c) <- c_initial
+  
+  
+  # below : transfer of parameter values from R
+  n1_initial <- user()
+  n2_initial <- user()
+  c_initial <- user()
+  d <- user()
+  s1 <- user()
+  s2<- user()
+  umax1<- user()
+  umax2<- user()
+  nhalf1<- user()
+  nhalf2<- user()
+})
+
+```
+
+
+```{r assign_chemostat}
+
+# x = x0*m^-0.25 # loss rate calc
+#x0 = 0.314 (+/-)? for herbivores
+
+chemostat_assigned <- chemostat_model$new(
+  n1_initial = 1,
+  n2_initial = 1,
+  c_initial = 0.5,
+  d = 0.05,
+  s1 = 1.25,
+  s2 = 0.5,
+  umax1 = 2,
+  umax2 = 0.5,
+  nhalf1= 0.2,
+  nhalf2 = 0.3
+)
+
+```
+
+```{r simulate_chemostat}
+
+timesteps <- seq(0,1000,0.1)
+
+chemostat_output_01 <- chemostat_assigned$run(timesteps)
+
+```
+
+```{r show_chemostat_output}
+
+head(chemostat_output_01)
+
+```
+
+
+```{r plot_chemostat}
+
+plot(
+  x = c(chemostat_output_01[,1],chemostat_output_01[,1],chemostat_output_01[,1]),
+  y = c(chemostat_output_01[,2],chemostat_output_01[,3],chemostat_output_01[,4]),
+  type = "n",
+  xlab = "time",
+  ylab = "population density"
+)
+
+lines(chemostat_output_01[,1], chemostat_output_01[,2], col="green", lwd = 3) # resource1, e.g. nitrogen
+lines(chemostat_output_01[,1], chemostat_output_01[,3], col="darkgreen", lwd = 3) # resource1, e.g. phosphorous
+lines(chemostat_output_01[,1], chemostat_output_01[,4], col="blue", lwd = 3) # consumer, e.g. algae
+
+
+```
 
